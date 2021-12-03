@@ -11,7 +11,11 @@
 
 namespace Tymon\JWTAuth\Providers;
 
+use Tymon\JWTAuth\Http\Parser\AuthHeaders;
 use Tymon\JWTAuth\Http\Parser\Cookies;
+use Tymon\JWTAuth\Http\Parser\InputSource;
+use Tymon\JWTAuth\Http\Parser\Parser;
+use Tymon\JWTAuth\Http\Parser\QueryString;
 use Tymon\JWTAuth\Http\Parser\RouteParams;
 
 class LaravelServiceProvider extends AbstractServiceProvider
@@ -29,11 +33,31 @@ class LaravelServiceProvider extends AbstractServiceProvider
         $this->aliasMiddleware();
 
         $this->extendAuthGuard();
+    }
 
-        $this->app['tymon.jwt.parser']->addParser([
-            new RouteParams,
-            new Cookies($this->config('decrypt_cookies')),
-        ]);
+    /**
+     * {@inheritdoc}
+     */
+    protected function registerTokenParser()
+    {
+        $this->app->singleton('tymon.jwt.parser', function ($app) {
+            $tokenKey = $this->config('token_key');
+
+            $parser = new Parser(
+                $app['request'],
+                [
+                    new AuthHeaders,
+                    (new QueryString)->setKey($tokenKey),
+                    (new InputSource)->setKey($tokenKey),
+                    (new RouteParams)->setKey($tokenKey),
+                    (new Cookies($this->config('decrypt_cookies')))->setKey($tokenKey),
+                ]
+            );
+
+            $app->refresh('request', $parser, 'setRequest');
+
+            return $parser;
+        });
     }
 
     /**
