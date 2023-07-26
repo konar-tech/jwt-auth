@@ -11,11 +11,10 @@
 
 namespace Tymon\JWTAuth\Providers;
 
+use Tymon\JWTAuth\Factory;
 use Tymon\JWTAuth\Http\Parser\AuthHeaders;
 use Tymon\JWTAuth\Http\Parser\Cookies;
-use Tymon\JWTAuth\Http\Parser\InputSource;
 use Tymon\JWTAuth\Http\Parser\Parser;
-use Tymon\JWTAuth\Http\Parser\QueryString;
 use Tymon\JWTAuth\Http\Parser\RouteParams;
 
 class LaravelServiceProvider extends AbstractServiceProvider
@@ -33,31 +32,6 @@ class LaravelServiceProvider extends AbstractServiceProvider
         $this->aliasMiddleware();
 
         $this->extendAuthGuard();
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    protected function registerTokenParser()
-    {
-        $this->app->singleton('tymon.jwt.parser', function ($app) {
-            $tokenKey = $this->config('token_key');
-
-            $parser = new Parser(
-                $app['request'],
-                [
-                    new AuthHeaders,
-                    (new QueryString)->setKey($tokenKey),
-                    (new InputSource)->setKey($tokenKey),
-                    (new RouteParams)->setKey($tokenKey),
-                    (new Cookies($this->config('decrypt_cookies')))->setKey($tokenKey),
-                ]
-            );
-
-            $app->refresh('request', $parser, 'setRequest');
-
-            return $parser;
-        });
     }
 
     /**
@@ -90,5 +64,37 @@ class LaravelServiceProvider extends AbstractServiceProvider
         foreach ($this->middlewareAliases as $alias => $middleware) {
             $router->$method($alias, $middleware);
         }
+    }
+
+    protected function registerTokenParser()
+    {
+        $this->app->singleton('tymon.jwt.parser', function ($app) {
+            $parser = new Parser(
+                $app['request'],
+                [
+                    new AuthHeaders,
+                    (new Cookies($this->config('decrypt_cookies')))->setKey($this->config('token_key')),
+                ]
+            );
+
+            $app->refresh('request', $parser, 'setRequest');
+
+            return $parser;
+        });
+    }
+
+    protected function registerPayloadFactory()
+    {
+        $this->app->singleton('tymon.jwt.payload.factory', function ($app) {
+            return (new Factory(
+                $app['tymon.jwt.claim.factory'],
+                $app['tymon.jwt.validators.payload']
+            ))->setDefaultClaims([
+                'iat',
+                'exp',
+                'nbf',
+                'jti',
+            ]);
+        });
     }
 }
