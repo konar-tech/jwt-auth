@@ -82,19 +82,4 @@ class LaravelServiceProvider extends AbstractServiceProvider
             return $parser;
         });
     }
-
-    protected function registerPayloadFactory()
-    {
-        $this->app->singleton('tymon.jwt.payload.factory', function ($app) {
-            return (new Factory(
-                $app['tymon.jwt.claim.factory'],
-                $app['tymon.jwt.validators.payload']
-            ))->setDefaultClaims([
-                'iat',
-                'exp',
-                'nbf',
-                'jti',
-            ]);
-        });
-    }
 }
